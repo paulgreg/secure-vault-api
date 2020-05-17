@@ -24,11 +24,7 @@ describe('crypto', () => {
       return aes
         .generateKey(passwordForTest, derivationParams)
         .then((results) => {
-          console.log(
-            'aesGenerateKey results: ',
-            results,
-            JSON.stringify(results)
-          )
+          console.log('aes.generateKey results:', results)
           assert.isDefined(results)
           assert.deepEqual(
             ['key', 'wrappedKey', 'derivation'],
@@ -60,10 +56,28 @@ describe('crypto', () => {
       return aes
         .generateKey(passwordForTest, derivationParams)
         .then(({ wrappedKey }) => {
-          assert.deepEqual(['key', 'iv'], Object.keys(wrappedKey))
+          assert.deepEqual(
+            ['key', 'name', 'iv', 'tagLength'],
+            Object.keys(wrappedKey)
+          )
           assert.equal(44, wrappedKey.key.byteLength)
           assert.equal(12, wrappedKey.iv.length)
         })
     })
+  })
+})
+describe('aes.encrypt', (results) => {
+  const clearTextMessage = 'Hello World'
+  it('should encrypt', () => {
+    return aes
+      .generateKey(passwordForTest, derivationParams)
+      .then(({ key }) => aes.encrypt(key, clearTextMessage))
+      .then((results) => {
+        console.log('aes.encrypt results:', results)
+        assert.deepEqual(
+          ['encryptedData', 'name', 'iv', 'tagLength'],
+          Object.keys(results)
+        )
+      })
   })
 })

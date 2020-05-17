@@ -62,41 +62,45 @@ const generateKey = async (password, derivationParams) => {
     derivationParams,
   })
 
-  const iv = window.crypto.getRandomValues(new Uint8Array(12))
-  const wrappedKey = await window.crypto.subtle.wrapKey(RAW, key, wrappingKey, {
+  const aesParams = {
     name: AES_GCM,
-    iv,
+    iv: window.crypto.getRandomValues(new Uint8Array(12)),
     tagLength: AES_TAG_LENGTH,
-  })
+  }
+  const wrappedKey = await window.crypto.subtle.wrapKey(
+    RAW,
+    key,
+    wrappingKey,
+    aesParams
+  )
   return {
     key,
     wrappedKey: {
       key: wrappedKey,
-      iv,
+      ...aesParams,
     },
     derivation,
   }
 }
 
 const encrypt = (key, data) => {
-  const textEncoder = new TextEncoder()
-  const arrayBufferData = textEncoder.encode(data)
+  const arrayBufferData = new TextEncoder().encode(data)
+
   //Don't re-use initialization vectors!
   //Always generate a new iv every time your encrypt!
   //Recommended to use 12 bytes length
-  const iv = window.crypto.getRandomValues(new Uint8Array(12))
+  const aesParams = {
+    name: AES_GCM,
+    iv: window.crypto.getRandomValues(new Uint8Array(12)),
+    tagLength: AES_TAG_LENGTH,
+  }
   return window.crypto.subtle
-    .encrypt(
-      {
-        name: AES_GCM,
-        iv,
-        tagLength: AES_TAG_LENGTH,
-      },
-      key,
-      arrayBufferData
-    )
+    .encrypt(aesParams, key, arrayBufferData)
     .then(function (encrypted) {
-      return new Uint8Array(encrypted)
+      return {
+        encryptedData: new Uint8Array(encrypted),
+        ...aesParams,
+      }
     })
     .catch(function (err) {
       console.error(err)
