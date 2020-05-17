@@ -15,8 +15,7 @@ const AES_TAG_LENGTH = 96
 
 const derivateWrappingKeyFromPassword = async ({
   password,
-  iterations = PBKDF2_DEFAULT_ITERATIONS,
-  salt = window.crypto.getRandomValues(new Uint8Array(16)),
+  derivationParams,
 }) => {
   const encodedPassword = new TextEncoder().encode(password)
 
@@ -27,14 +26,18 @@ const derivateWrappingKeyFromPassword = async ({
     false,
     ['deriveBits', 'deriveKey']
   )
+  const {
+    iterations = PBKDF2_DEFAULT_ITERATIONS,
+    salt = window.crypto.getRandomValues(new Uint8Array(16)),
+  } = derivationParams
 
   const name = PBKDF2
   const wrappingKey = await window.crypto.subtle.deriveKey(
     {
       name,
-      iterations: iterations,
+      iterations,
       hash: SHA512,
-      salt: salt,
+      salt,
     },
     keyMaterial,
     { name: AES_GCM, length: AES_KEY_SIZE },
@@ -44,7 +47,7 @@ const derivateWrappingKeyFromPassword = async ({
   return { wrappingKey, derivation: { name, iterations, salt } }
 }
 
-const generateKey = async (password, optionalIterations) => {
+const generateKey = async (password, derivationParams) => {
   const key = await window.crypto.subtle.generateKey(
     {
       name: AES_GCM,
@@ -56,7 +59,7 @@ const generateKey = async (password, optionalIterations) => {
 
   const { wrappingKey, derivation } = await derivateWrappingKeyFromPassword({
     password,
-    iterations: optionalIterations,
+    derivationParams,
   })
 
   const iv = window.crypto.getRandomValues(new Uint8Array(12))

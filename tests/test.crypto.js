@@ -2,6 +2,7 @@ import { hasNativeCryptoSupport, aes } from '../src/crypto.js'
 
 const assert = chai.assert
 const pbkdf2FewIterationForTests = 1
+const derivationParams = { iterations: pbkdf2FewIterationForTests }
 const passwordForTest = 'password'
 
 describe('crypto', () => {
@@ -21,9 +22,13 @@ describe('crypto', () => {
   describe('aes.generateKey', (results) => {
     it('should return a key, wrapping key and pbkdf2 data', () => {
       return aes
-        .generateKey(passwordForTest, pbkdf2FewIterationForTests)
+        .generateKey(passwordForTest, derivationParams)
         .then((results) => {
-          console.log('aesGenerateKey results: ', results)
+          console.log(
+            'aesGenerateKey results: ',
+            results,
+            JSON.stringify(results)
+          )
           assert.isDefined(results)
           assert.deepEqual(
             ['key', 'wrappedKey', 'derivation'],
@@ -33,27 +38,27 @@ describe('crypto', () => {
     })
     it('should return a AES-GCM-256 key', () => {
       return aes
-        .generateKey(passwordForTest, pbkdf2FewIterationForTests)
+        .generateKey(passwordForTest, derivationParams)
         .then(({ key }) => {
           assert.include({ name: 'AES-GCM', length: 256 }, key.algorithm)
         })
     })
     it('should return derivation parameters', () => {
       return aes
-        .generateKey(passwordForTest, pbkdf2FewIterationForTests)
+        .generateKey(passwordForTest, derivationParams)
         .then(({ derivation }) => {
           assert.deepEqual(
             ['name', 'iterations', 'salt'],
             Object.keys(derivation)
           )
           assert.equal('PBKDF2', derivation.name)
-          assert.equal(pbkdf2FewIterationForTests, derivation.iterations)
+          assert.equal(derivationParams.iterations, derivation.iterations)
           assert.equal(16, derivation.salt.length)
         })
     })
     it('should return a AES-GCM-256 wrapped key', () => {
       return aes
-        .generateKey(passwordForTest, pbkdf2FewIterationForTests)
+        .generateKey(passwordForTest, derivationParams)
         .then(({ wrappedKey }) => {
           assert.deepEqual(['key', 'iv'], Object.keys(wrappedKey))
           assert.equal(44, wrappedKey.key.byteLength)
