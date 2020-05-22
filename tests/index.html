@@ -8,13 +8,18 @@
     <script src="../node_modules/chai/chai.js"></script>
     <script src="../node_modules/mocha/mocha.js"></script>
     <script class="mocha-init">
-      mocha.setup('bdd')
-      mocha.checkLeaks()
+      mocha.setup({
+        allowUncaught: true,
+        bail: true,
+        checkLeaks: true,
+        global: ['regeneratorRuntime', 'Module'],
+        retries: 1,
+        slow: '100',
+        timeout: '1000',
+        ui: 'bdd',
+      })
     </script>
-    <script type="module" src="../src/storage.js"></script>
-    <script type="module" src="./test.storage.js"></script>
-    <script type="module" src="../src/crypto.js"></script>
-    <script type="module" src="./test.crypto.js"></script>
+    <script type="module" src="../build/test.crypto.js"></script>
     <style>
       body {
         padding: 1em;

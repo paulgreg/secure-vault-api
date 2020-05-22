@@ -9,6 +9,7 @@
     "deps": "mkdir -p ./build",
     "gen-cert": "openssl req -newkey rsa:2048 -new -nodes -x509 -days 3650 -keyout key.pem -out cert.pem",
     "serve": "npx http-server -S -C cert.pem .",
+    "dev": "npm run deps && webpack --mode development --watch",
     "build": "npm run deps && webpack --mode production --optimize-minimize"
   },
   "repository": {
@@ -27,7 +28,10 @@
   },
   "homepage": "https://github.com/paulgreg/secure-vault-api#readme",
   "browserslist": "> 0.25%, not dead",
-  "dependencies": {},
+  "dependencies": {
+    "argon2-browser": "^1.13.0",
+    "base64-loader": "^1.0.0"
+  },
   "devDependencies": {
     "@babel/core": "^7.9.6",
     "@babel/plugin-transform-runtime": "^7.9.6",

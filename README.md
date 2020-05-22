@@ -15,12 +15,19 @@ That secure-vault-api contains :
 - storage.js : functions about localStorage (mainly for handling not suported / accessible like when using private / incognito mode),
 - vault.js : functions about vault
 
+## Cryptography
+
+That project uses Web Crypto API for random generation and aes encryption.
+
+We use argon2id for key derivation and more specifically [antelle/argon2-browser](https://github.com/antelle/argon2-browser/)’s browser implementation (thanks).
+
 ## Tests
 
 Since Web Crypto API requires a browser and requires TLS, you’ll need to generate a certificate by `npm run gen-cert` then launch web server via `npm run serve`.
 
-Open then the tests page from `tests` directory to launch Mocha tests suite.
-Tests are using directy `src` directory, so you’ll need a modern decent browser since I’m using es6 features, async/await.
+Then launch `npm run dev` to build modules and open then the tests page from `tests` directory to launch Mocha tests suite.
+
+You’ll need a modern decent browser since I’m using es6 features, async/await.
 
 ## Build
 
