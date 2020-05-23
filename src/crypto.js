@@ -6,8 +6,6 @@ export const hasNativeCryptoSupport = () =>
   )
 
 const RAW = 'raw'
-const SHA512 = 'SHA-512'
-
 const AES_GCM = 'AES-GCM'
 const AES_KEY_SIZE = 256
 const AES_TAG_LENGTH = 96
@@ -46,69 +44,127 @@ const getDerivationParams = (p = {}) => {
 
 const derivateKey = async (password, inputParams) => {
   const params = getDerivationParams(inputParams)
-  return (
-    argon2
-      .hash({
-        pass: password,
-        hashLen: 32, // desired hash length = 32 = 256 bits
-        ...params,
-      })
-      // result
-      .then(
-        ({
-          hash, // hash as Uint8Array
-          hashHex, // hash as hex-string
-          encoded, // encoded hash, as required by argon2,
-        }) => {
-          return { hash, hashHex, encoded, derivationParams: params }
-        }
-      )
-      // or error
-      .catch((err) => {
-        console.error('argon2 error', err)
-        return err
-      })
-  )
+  const {
+    hash, // hash as Uint8Array
+    hashHex, // hash as hex-string
+    encoded, // encoded hash, as required by argon2,
+  } = await argon2.hash({
+    pass: password,
+    hashLen: 32, // desired hash length = 32 = 256 bits
+    ...params,
+  })
+
+  return { hash, hashHex, encoded, derivationParams: params }
 }
 
 export const derivation = {
   getDerivationParams,
   derivateKey,
 }
-//  const key = await window.crypto.subtle.generateKey(
-//    {
-//      name: AES_GCM,
-//      length: AES_KEY_SIZE,
-//    },
-//    true,
-//    ['encrypt', 'decrypt']
-//  )
-//
-//  const { wrappingKey, derivation } = await derivateWrappingKeyFromPassword({
-//    password,
-//    derivationParams,
-//  })
-//
-//  const aesParams = {
-//    name: AES_GCM,
-//    iv: window.crypto.getRandomValues(new Uint8Array(12)),
-//    tagLength: AES_TAG_LENGTH,
-//  }
-//  const wrappedKey = await window.crypto.subtle.wrapKey(
-//    RAW,
-//    key,
-//    wrappingKey,
-//    aesParams
-//  )
-//  return {
-//    key,
-//    wrappedKey: {
-//      key: wrappedKey,
-//      ...aesParams,
-//    },
-//    derivation,
-//  }
-//}
+
+export const arrayBufferToUint8Array = (buffer) => {
+  const dataViewer = new DataView(buffer)
+  const array = new Uint8Array(buffer.byteLength)
+  for (let i = 0; i < array.length; i++) array[i] = dataViewer.getUint8(i)
+  return array
+}
+
+export const deserializeUint8Array = (data) =>
+  new Uint8Array(Object.values(data))
+
+export const createIdentity = async (password, input = {}) => {
+  if (!password) throw new Error('PASSWORD_EMPTY')
+  if (password.length < 8) throw new Error('PASSWORD_TOO_SHORT')
+
+  const { derivationParams: inputDerivationParams } = input
+
+  const { hash, derivationParams } = await derivateKey(
+    password,
+    inputDerivationParams
+  )
+
+  const keyEncryptionKey = await window.crypto.subtle.importKey(
+    RAW,
+    hash,
+    AES_GCM,
+    false,
+    ['wrapKey']
+  )
+
+  const fileEncryptionKey = await generateFileEncryptionKey()
+
+  const wrappedFileEncryptionKeyParams = {
+    name: AES_GCM,
+    iv: window.crypto.getRandomValues(new Uint8Array(12)),
+    tagLength: AES_TAG_LENGTH,
+  }
+
+  const wrappedFileEncryptionKey = await window.crypto.subtle.wrapKey(
+    RAW,
+    fileEncryptionKey,
+    keyEncryptionKey,
+    wrappedFileEncryptionKeyParams
+  )
+
+  return {
+    derivationParams,
+    keyEncryptionKey,
+    fileEncryptionKey,
+    wrappedFileEncryptionKey: arrayBufferToUint8Array(wrappedFileEncryptionKey),
+    wrappedFileEncryptionKeyParams,
+  }
+}
+
+export const loadIdentity = async (password, input = {}) => {
+  const {
+    derivationParams,
+    wrappedFileEncryptionKey,
+    wrappedFileEncryptionKeyParams,
+  } = input
+
+  if (!password) throw new Error('PASSWORD_EMPTY')
+  if (password.length < 8) throw new Error('PASSWORD_TOO_SHORT')
+  if (!wrappedFileEncryptionKey) throw new Error('KEY_MISSING')
+  if (!wrappedFileEncryptionKeyParams) throw new Error('KEY_PARAMS_MISSING')
+  if (!wrappedFileEncryptionKeyParams.iv)
+    throw new Error('KEY_PARAMS_IV_MISSING')
+
+  const { hash } = await derivateKey(password, derivationParams)
+
+  const keyEncryptionKey = await window.crypto.subtle.importKey(
+    RAW,
+    hash,
+    AES_GCM,
+    false,
+    ['unwrapKey']
+  )
+
+  const fileEncryptionKey = await window.crypto.subtle.unwrapKey(
+    RAW,
+    deserializeUint8Array(wrappedFileEncryptionKey),
+    keyEncryptionKey,
+    {
+      name: AES_GCM,
+      tagLength: AES_TAG_LENGTH,
+      iv: deserializeUint8Array(wrappedFileEncryptionKeyParams.iv),
+    },
+    { name: AES_GCM },
+    false,
+    ['encrypt', 'decrypt']
+  )
+
+  return { fileEncryptionKey }
+}
+
+const generateFileEncryptionKey = async () =>
+  window.crypto.subtle.generateKey(
+    {
+      name: AES_GCM,
+      length: AES_KEY_SIZE,
+    },
+    true,
+    ['encrypt', 'decrypt']
+  )
 
 const encrypt = (key, data) => {
   const arrayBufferData = new TextEncoder().encode(data)

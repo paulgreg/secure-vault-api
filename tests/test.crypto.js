@@ -2,7 +2,11 @@ import {
   hasNativeCryptoSupport,
   generateRandomString,
   convertByteToReadableChar,
+  arrayBufferToUint8Array,
+  deserializeUint8Array,
   derivation,
+  createIdentity,
+  loadIdentity,
   aes,
 } from '../src/crypto.js'
 
@@ -93,6 +97,31 @@ describe('crypto', () => {
       assert.equal(s, generateRandomString(s).length)
     })
   })
+  describe('ArrayBuffer conversion', () => {
+    it('serializeArrayBuffer', () => {
+      const inputArray = new Uint8Array([1, 2, 3])
+      const buffer = inputArray.buffer
+      const outputArray = arrayBufferToUint8Array(buffer)
+      assert.equal(inputArray.length, outputArray.length)
+      for (let i = 0; i < inputArray.length; i++) {
+        assert.equal(inputArray[i], outputArray[i])
+      }
+    })
+    it('Uint8array saved to json then deserialize', () => {
+      const data = new Uint8Array([1, 2, 3])
+      const dataInJson = JSON.stringify(data)
+      const dataResoredFromJson = JSON.parse(dataInJson)
+      const desieralizedData = deserializeUint8Array(dataResoredFromJson)
+      assert.equal(
+        data.length,
+        desieralizedData.length,
+        'array has different size after deserialization'
+      )
+      for (let i = 0; i < data.length; i++) {
+        assert.equal(data[i], desieralizedData[i])
+      }
+    })
+  })
   describe('derivation', () => {
     describe('getDerivationParams', () => {
       it('should return default parameters', () => {
@@ -138,6 +167,7 @@ describe('crypto', () => {
           .derivateKey(passwordForTest, derivationParamsForTest)
           .then((results) => {
             console.log('derivateKey:', results)
+            assert.isDefined(results)
             assert.deepEqual(
               ['hash', 'hashHex', 'encoded', 'derivationParams'],
               Object.keys(results)
@@ -155,53 +185,156 @@ describe('crypto', () => {
     })
   })
 
-  //  describe('aes.generateKey', (results) => {
-  //    it('should return a key, wrapping key and pbkdf2 data', () => {
-  //      return aes
-  //        .generateKey(passwordForTest, derivationParams)
-  //        .then((results) => {
-  //          console.log('aes.generateKey results:', results)
-  //          assert.isDefined(results)
-  //          assert.deepEqual(
-  //            ['key', 'wrappedKey', 'derivation'],
-  //            Object.keys(results)
-  //          )
-  //        })
-  //    })
-  //    it('should return a AES-GCM-256 key', () => {
-  //      return aes
-  //        .generateKey(passwordForTest, derivationParams)
-  //        .then(({ key }) => {
-  //          assert.include({ name: 'AES-GCM', length: 256 }, key.algorithm)
-  //        })
-  //    })
-  //    it('should return derivation parameters', () => {
-  //      return aes
-  //        .generateKey(passwordForTest, derivationParams)
-  //        .then(({ derivation }) => {
-  //          assert.deepEqual(
-  //            ['name', 'iterations', 'salt'],
-  //            Object.keys(derivation)
-  //          )
-  //          assert.equal('PBKDF2', derivation.name)
-  //          assert.equal(derivationParams.iterations, derivation.iterations)
-  //          assert.equal(16, derivation.salt.length)
-  //        })
-  //    })
-  //    it('should return a AES-GCM-256 wrapped key', () => {
-  //      return aes
-  //        .generateKey(passwordForTest, derivationParams)
-  //        .then(({ wrappedKey }) => {
-  //          assert.deepEqual(
-  //            ['key', 'name', 'iv', 'tagLength'],
-  //            Object.keys(wrappedKey)
-  //          )
-  //          assert.equal(44, wrappedKey.key.byteLength)
-  //          assert.equal(12, wrappedKey.iv.length)
-  //        })
-  //    })
-  //  })
-  //})
+  describe('createIdentify', () => {
+    it('should should throw error if no password', () =>
+      createIdentity().catch((e) => assert.equal('PASSWORD_EMPTY', e.message)))
+
+    it('should should throw error if password < 8 chars', () =>
+      createIdentity('1234567').catch((e) =>
+        assert.equal('PASSWORD_TOO_SHORT', e.message)
+      ))
+
+    it('should return derivationParams, keyEncryptionKey, fileEncryptionKey, wrappedFileEncryptionKey and wrappedFileEncryptionKeyParams', () => {
+      return createIdentity(passwordForTest, {
+        derivationParams: derivationParamsForTest,
+      }).then((results) => {
+        console.log('createIdentity:', JSON.stringify(results))
+        assert.isDefined(results)
+        assert.deepEqual(
+          [
+            'derivationParams',
+            'keyEncryptionKey',
+            'fileEncryptionKey',
+            'wrappedFileEncryptionKey',
+            'wrappedFileEncryptionKeyParams',
+          ],
+          Object.keys(results)
+        )
+        assert.deepEqual(
+          ['name', 'iv', 'tagLength'],
+          Object.keys(results.wrappedFileEncryptionKeyParams)
+        )
+        assert.equal(
+          'AES-GCM',
+          results.wrappedFileEncryptionKeyParams.name,
+          'bad AES key algorithm'
+        )
+        assert.equal(
+          96,
+          results.wrappedFileEncryptionKeyParams.tagLength,
+          'bad tag length'
+        )
+        assert.equal(
+          12,
+          results.wrappedFileEncryptionKeyParams.iv.length,
+          'bad IV size'
+        )
+      })
+    })
+  })
+  describe('loadIdentity', () => {
+    it('should should throw error if no password', () =>
+      loadIdentity().catch((e) => assert.equal('PASSWORD_EMPTY', e.message)))
+
+    it('should should throw error if password < 8 chars', () =>
+      loadIdentity('1234567').catch((e) =>
+        assert.equal('PASSWORD_TOO_SHORT', e.message)
+      ))
+
+    it('should load previous identity', () => {
+      const derivationParams = {
+        type: 2,
+        time: 1,
+        mem: 10,
+        parallelism: 1,
+        salt: "At*$+r94>8nJNfGt'; UM*8BW&]K3tEl",
+      }
+
+      const wrappedFileEncryptionKey = {
+        '0': 109,
+        '1': 67,
+        '2': 175,
+        '3': 2,
+        '4': 160,
+        '5': 153,
+        '6': 251,
+        '7': 21,
+        '8': 249,
+        '9': 158,
+        '10': 63,
+        '11': 5,
+        '12': 95,
+        '13': 211,
+        '14': 190,
+        '15': 170,
+        '16': 136,
+        '17': 247,
+        '18': 95,
+        '19': 84,
+        '20': 163,
+        '21': 189,
+        '22': 155,
+        '23': 203,
+        '24': 104,
+        '25': 112,
+        '26': 80,
+        '27': 212,
+        '28': 82,
+        '29': 102,
+        '30': 184,
+        '31': 216,
+        '32': 15,
+        '33': 79,
+        '34': 14,
+        '35': 58,
+        '36': 24,
+        '37': 38,
+        '38': 157,
+        '39': 7,
+        '40': 66,
+        '41': 60,
+        '42': 177,
+        '43': 146,
+      }
+      const wrappedFileEncryptionKeyParams = {
+        name: 'AES-GCM',
+        iv: {
+          '0': 112,
+          '1': 164,
+          '2': 41,
+          '3': 211,
+          '4': 174,
+          '5': 206,
+          '6': 195,
+          '7': 202,
+          '8': 211,
+          '9': 160,
+          '10': 90,
+          '11': 169,
+        },
+        tagLength: 96,
+      }
+
+      return loadIdentity(passwordForTest, {
+        derivationParams,
+        wrappedFileEncryptionKey,
+        wrappedFileEncryptionKeyParams,
+      }).then((results) => {
+        console.log('loadIdentity', JSON.stringify(results))
+        assert.isDefined(results)
+        //assert.deepEqual(
+        //  [
+        //    'derivationParams',
+        //    'keyEncryptionKey',
+        //    'fileEncryptionKey',
+        //    'wrappedFileEncryptionKey',
+        //    'wrappedFileEncryptionKeyParams',
+        //  ],
+        //  Object.keys(results)
+        //)
+      })
+    })
+  })
   //describe('aes.encrypt', (results) => {
   //  const clearTextMessage = 'Hello World'
   //  it('should encrypt', () => {
