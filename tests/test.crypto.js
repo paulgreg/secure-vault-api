@@ -322,16 +322,12 @@ describe('crypto', () => {
       }).then((results) => {
         console.log('loadIdentity', JSON.stringify(results))
         assert.isDefined(results)
-        //assert.deepEqual(
-        //  [
-        //    'derivationParams',
-        //    'keyEncryptionKey',
-        //    'fileEncryptionKey',
-        //    'wrappedFileEncryptionKey',
-        //    'wrappedFileEncryptionKeyParams',
-        //  ],
-        //  Object.keys(results)
-        //)
+        assert.deepEqual(
+          [
+            'fileEncryptionKey'
+          ],
+          Object.keys(results)
+        )
       })
     })
   })
