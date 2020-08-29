@@ -1,5 +1,9 @@
 # secure-vault-api
 
+
+That project is on stand-by (use of a self-hosted bitwarden).
+
+
 That project is a part of a PWA based password manager.
 
 That project is or will be composed of theses repositories :
